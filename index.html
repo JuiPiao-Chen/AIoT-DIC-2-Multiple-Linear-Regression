@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIC-2 Multiple Linear Regression</title>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --ink: #1d2433; --muted: #64708a; --line: #e1e5ec;
+    --accent: #2f6fdf; --accent-soft: #e8f0fd; --good: #1a8f5a; --bad: #c2453b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.55 -apple-system, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 16px 60px; }
+  header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  header p { margin: 0; color: var(--muted); }
+  .steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 22px; }
+  .steps span { font-size: 12px; padding: 3px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
+  .card h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .card h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  select, input[type=text], input[type=number] {
+    font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; min-width: 0; }
+  #urlInput { width: min(560px, 100%); }
+  button { font: inherit; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--accent);
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .grow { flex: 1 1 320px; }
+  .status { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 1.2em; }
+  .status.err { color: var(--bad); }
+  .feat-list { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
+  .feat-list label { font-size: 14px; display: flex; align-items: center; gap: 5px; }
+  .feat-list .cat { font-size: 11px; color: var(--muted); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .metric { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+  .metric .k { font-size: 12px; color: var(--muted); }
+  .metric .v { font-size: 1.45rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .metric .s { font-size: 12px; color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  .chart-box { position: relative; height: 320px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { background: #fafbfc; font-weight: 600; }
+  tr.removed td { color: var(--muted); text-decoration: line-through; }
+  .sig { color: var(--good); font-weight: 600; }
+  .nsig { color: var(--bad); }
+  .eq { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; background: #fafbfc;
+        border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; white-space: nowrap; }
+  ol.log { margin: 0; padding-left: 20px; font-size: 14px; }
+  .pred-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .pred-out { margin-top: 12px; font-size: 1.1rem; }
+  .pred-out b { color: var(--accent); }
+  .note { font-size: 13px; color: var(--muted); }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Multiple Linear Regression — DIC-2</h1>
+    <p>Kaggle 50 Startups 與 Boston Housing 兩個問題，依 CRISP-DM 流程完成；也可以輸入任意 CSV Dataset URL。</p>
+  </header>
+  <div class="steps">
+    <span>1. Business Understanding</span><span>2. Data Understanding</span><span>3. Data Preparation</span>
+    <span>4. Modeling</span><span>5. Evaluation</span><span>6. Deployment</span>
+  </div>
+
+  <!-- 1. Business understanding + data source -->
+  <section class="card">
+    <h2>1. 選擇問題 / Dataset</h2>
+    <div class="row">
+      <div class="field">
+        <label for="problemSel">Problem</label>
+        <select id="problemSel">
+          <option value="startups">Problem 1：50 Startups（預測 Profit）</option>
+          <option value="boston">Problem 2：Boston Housing（預測 MEDV）</option>
+          <option value="custom">自訂 Dataset URL…</option>
+        </select>
+      </div>
+      <div class="field grow">
+        <label for="urlInput">Dataset URL（CSV）</label>
+        <input type="text" id="urlInput" placeholder="https://raw.githubusercontent.com/.../data.csv">
+      </div>
+      <button id="loadBtn">載入</button>
+      <button id="fileBtn" class="ghost" title="或上傳本機 CSV">上傳 CSV</button>
+      <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
+    </div>
+    <p id="bizText" class="note" style="margin:12px 0 0"></p>
+    <div id="status" class="status"></div>
+  </section>
+
+  <!-- 2. Data understanding -->
+  <section class="card" id="dataCard" hidden>
+    <h2>2. Data Understanding <small id="dataShape"></small></h2>
+    <div class="scroll"><table id="statsTable"></table></div>
+    <details style="margin-top:12px"><summary class="note">預覽前 10 筆資料</summary>
+      <div class="scroll" style="margin-top:8px"><table id="previewTable"></table></div>
+    </details>
+  </section>
+
+  <!-- 3. Data preparation + 4. modeling settings -->
+  <section class="card" id="setupCard" hidden>
+    <h2>3. Data Preparation &amp; 4. Modeling 設定</h2>
+    <div class="row">
+      <div class="field">
+        <label for="targetSel">Target (y)</label>
+        <select id="targetSel"></select>
+      </div>
+      <div class="field">
+        <label for="testSize">Test size</label>
+        <input type="number" id="testSize" value="0.2" min="0.1" max="0.5" step="0.05" style="width:90px">
+      </div>
+      <div class="field">
+        <label for="seed">Random seed</label>
+        <input type="number" id="seed" value="42" style="width:90px">
+      </div>
+      <div class="field">
+        <label for="method">Feature selection</label>
+        <select id="method">
+          <option value="backward">Backward Elimination（p-value）</option>
+          <option value="all">All-in（使用全部勾選特徵）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="sl">Significance level</label>
+        <input type="number" id="sl" value="0.05" min="0.001" max="0.5" step="0.01" style="width:90px">
+      </div>
+      <button id="trainBtn">訓練模型</button>
+    </div>
+    <div class="field" style="margin-top:14px">
+      <label>Features (X)　<span class="note" style="text-transform:none;font-weight:400">類別欄位會自動 One-Hot 編碼（drop first，避免 dummy variable trap）</span></label>
+      <div class="feat-list" id="featList"></div>
+    </div>
+  </section>
+
+  <!-- 5. Evaluation -->
+  <section id="results" hidden>
+    <section class="card">
+      <h2>5. Evaluation <small id="evalSub"></small></h2>
+      <div class="metrics" id="metrics"></div>
+    </section>
+
+    <section class="card">
+      <h2>回歸方程式</h2>
+      <div class="eq" id="equation"></div>
+      <div id="elimBox" style="margin-top:14px"></div>
+    </section>
+
+    <section class="card">
+      <h2>係數與顯著性 <small>（training set OLS）</small></h2>
+      <div class="scroll"><table id="coefTable"></table></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card"><h2>Actual vs Predicted <small>test set</small></h2><div class="chart-box"><canvas id="chartPred"></canvas></div></section>
+      <section class="card"><h2>Residuals <small>test set</small></h2><div class="chart-box"><canvas id="chartResid"></canvas></div></section>
+    </div>
+    <section class="card"><h2>與 Target 的相關係數</h2><div class="chart-box" style="height:280px"><canvas id="chartCorr"></canvas></div></section>
+
+    <!-- 6. Deployment -->
+    <section class="card">
+      <h2>6. Deployment：輸入特徵值進行預測</h2>
+      <div class="pred-form" id="predForm"></div>
+      <div class="pred-out" id="predOut"></div>
+    </section>
+  </section>
+
+  <footer>DIC-2 · Multiple Linear Regression · 計算全部在瀏覽器端完成（OLS normal equation + t-test p-values）</footer>
+</div>
+
+<script>
+// ---------------- presets ----------------
+const PRESETS = {
+  startups: {
+    local: 'data/50_Startups.csv',
+    url: 'https://raw.githubusercontent.com/Avik-Jain/100-Days-Of-ML-Code/master/datasets/50_Startups.csv',
+    target: 'Profit',
+    biz: '商業理解：創投想知道新創公司的 R&D、Administration、Marketing 支出與所在州別，哪些因素真正影響利潤 (Profit)，以決定投資方向。'
+  },
+  boston: {
+    local: 'data/BostonHousing.csv',
+    url: 'https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv',
+    target: 'medv',
+    biz: '商業理解：依據波士頓各區的犯罪率、房間數 (rm)、低收入比例 (lstat)、師生比等 13 個特徵，預測房價中位數 medv（單位：千美元）。'
+  },
+  custom: { biz: '自訂資料集：輸入任何公開 CSV 的 URL（需允許 CORS，例如 raw.githubusercontent.com），或上傳本機 CSV。預設最後一欄為 Target。' }
+};
+
+const $ = id => document.getElementById(id);
+let DATA = null;          // { columns, rows, types }
+let MODEL = null;
+const charts = {};
+
+// ---------------- math helpers ----------------
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function invert(M) {               // Gauss-Jordan with partial pivoting
+  const n = M.length, A = M.map((r, i) => [...r, ...Array.from({ length: n }, (_, j) => +(i === j))]);
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+    if (Math.abs(A[p][c]) < 1e-12) return null;
+    [A[c], A[p]] = [A[p], A[c]];
+    const d = A[c][c]; for (let j = 0; j < 2 * n; j++) A[c][j] /= d;
+    for (let r = 0; r < n; r++) if (r !== c) { const f = A[r][c]; if (f) for (let j = 0; j < 2 * n; j++) A[r][j] -= f * A[c][j]; }
+  }
+  return A.map(r => r.slice(n));
+}
+
+function lgamma(x) { const g = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let y = x, t = x + 5.5; t -= (x + 0.5) * Math.log(t); let s = 1.000000000190015; for (const c of g) s += c / ++y; return -t + Math.log(2.5066282746310005 * s / x); }
+function betacf(a, b, x) { let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap; if (Math.abs(d) < 1e-30) d = 1e-30; d = 1 / d; let h = d;
+  for (let m = 1; m <= 200; m++) { const m2 = 2 * m; let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30; c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30; d = 1 / d; h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2)); d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30; c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d; const del = d * c; h *= del; if (Math.abs(del - 1) < 3e-12) break; } return h; }
+function ibeta(x, a, b) { if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b; }
+const tPvalue = (t, df) => ibeta(df / (df + t * t), df / 2, 0.5);   // two-sided
+
+function ols(X, y) {               // X without intercept column
+  const n = X.length, A = X.map(r => [1, ...r]), k = A[0].length;
+  const XtX = Array.from({ length: k }, (_, i) => Array.from({ length: k }, (_, j) => { let s = 0; for (let r = 0; r < n; r++) s += A[r][i] * A[r][j]; return s; }));
+  const inv = invert(XtX); if (!inv) return null;
+  const Xty = Array.from({ length: k }, (_, i) => { let s = 0; for (let r = 0; r < n; r++) s += A[r][i] * y[r]; return s; });
+  const beta = inv.map(row => row.reduce((s, v, j) => s + v * Xty[j], 0));
+  const pred = A.map(r => r.reduce((s, v, j) => s + v * beta[j], 0));
+  const sse = y.reduce((s, v, i) => s + (v - pred[i]) ** 2, 0);
+  const mean = y.reduce((a, b) => a + b, 0) / n, sst = y.reduce((s, v) => s + (v - mean) ** 2, 0);
+  const df = n - k, sigma2 = sse / Math.max(df, 1);
+  const se = inv.map((r, i) => Math.sqrt(Math.max(sigma2 * r[i], 0)));
+  const t = beta.map((b, i) => b / se[i]);
+  const p = t.map(v => df > 0 && isFinite(v) ? tPvalue(v, df) : NaN);
+  const r2 = 1 - sse / sst;
+  return { beta, se, t, p, r2, adjR2: 1 - (1 - r2) * (n - 1) / Math.max(df, 1), df };
+}
+
+function metrics(y, yhat, k) {
+  const n = y.length, mean = y.reduce((a, b) => a + b, 0) / n;
+  let sse = 0, sst = 0, sae = 0;
+  y.forEach((v, i) => { sse += (v - yhat[i]) ** 2; sst += (v - mean) ** 2; sae += Math.abs(v - yhat[i]); });
+  const r2 = 1 - sse / sst;
+  return { r2, adjR2: 1 - (1 - r2) * (n - 1) / Math.max(n - k - 1, 1), mae: sae / n, rmse: Math.sqrt(sse / n), mse: sse / n };
+}
+
+function pearson(a, b) {
+  const n = a.length, ma = a.reduce((s, v) => s + v, 0) / n, mb = b.reduce((s, v) => s + v, 0) / n;
+  let sab = 0, saa = 0, sbb = 0; for (let i = 0; i < n; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
+  return sab / Math.sqrt(saa * sbb);
+}
+
+const fmt = (v, d = 4) => {
+  if (v === null || v === undefined || Number.isNaN(v)) return '—';
+  const a = Math.abs(v);
+  if (a !== 0 && (a < 1e-3 || a >= 1e7)) return v.toExponential(3);
+  return v.toLocaleString('en-US', { maximumFractionDigits: a >= 1000 ? 2 : d });
+};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------------- data loading ----------------
+function setStatus(msg, err = false) { $('status').textContent = msg; $('status').className = 'status' + (err ? ' err' : ''); }
+
+async function fetchText(urls) {
+  let lastErr;
+  for (const u of urls) {
+    try { const r = await fetch(u); if (!r.ok) throw new Error(`HTTP ${r.status}`); return await r.text(); }
+    catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+
+function parseCSV(text) {
+  const res = Papa.parse(text.trim(), { header: true, skipEmptyLines: true });
+  const columns = res.meta.fields.filter(c => c !== '' && c != null);
+  const rows = res.data.map(r => { const o = {}; columns.forEach(c => o[c] = (r[c] ?? '').toString().trim()); return o; });
+  const types = {};
+  columns.forEach(c => {
+    const vals = rows.map(r => r[c]).filter(v => v !== '');
+    types[c] = vals.length && vals.every(v => isFinite(Number(v))) ? 'num' : 'cat';
+  });
+  if (!columns.length || !rows.length) throw new Error('CSV 沒有資料');
+  return { columns, rows, types };
+}
+
+async function loadDataset() {
+  const key = $('problemSel').value, preset = PRESETS[key];
+  const url = $('urlInput').value.trim();
+  if (!url) return setStatus('請輸入 Dataset URL', true);
+  setStatus('載入中…'); $('loadBtn').disabled = true;
+  try {
+    const sources = key !== 'custom' && url === preset.url ? [preset.local, preset.url] : [url];
+    const text = await fetchText(sources);
+    useData(parseCSV(text), key !== 'custom' && url === preset.url ? preset.target : null, url);
+  } catch (e) {
+    setStatus(`載入失敗：${e.message}（請確認 URL 為公開 CSV 且允許跨網域存取，或改用「上傳 CSV」）`, true);
+  } finally { $('loadBtn').disabled = false; }
+}
+
+function useData(data, target, sourceLabel) {
+  DATA = data;
+  const numCols = data.columns.filter(c => data.types[c] === 'num');
+  if (!numCols.length) return setStatus('找不到數值欄位可作為 Target', true);
+  if (!target || !numCols.includes(target)) target = numCols.includes(data.columns.at(-1)) ? data.columns.at(-1) : numCols.at(-1);
+  setStatus(`已載入 ${data.rows.length} 筆 × ${data.columns.length} 欄　(${sourceLabel})`);
+  $('targetSel').innerHTML = numCols.map(c => `<option ${c === target ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  renderDataUnderstanding();
+  renderFeatureList();
+  $('dataCard').hidden = $('setupCard').hidden = false;
+  train();
+}
+
+// ---------------- data understanding ----------------
+function renderDataUnderstanding() {
+  const { columns, rows, types } = DATA;
+  $('dataShape').textContent = `${rows.length} rows × ${columns.length} columns`;
+  let h = '<tr><th>Column</th><th>Type</th><th>Missing</th><th>Mean</th><th>Std</th><th>Min</th><th>Max</th><th>Unique</th></tr>';
+  columns.forEach(c => {
+    const raw = rows.map(r => r[c]), miss = raw.filter(v => v === '').length, uniq = new Set(raw.filter(v => v !== '')).size;
+    if (types[c] === 'num') {
+      const v = raw.filter(x => x !== '').map(Number), n = v.length, m = v.reduce((a, b) => a + b, 0) / n;
+      const sd = Math.sqrt(v.reduce((s, x) => s + (x - m) ** 2, 0) / Math.max(n - 1, 1));
+      h += `<tr><td>${esc(c)}</td><td>numeric</td><td>${miss}</td><td>${fmt(m)}</td><td>${fmt(sd)}</td><td>${fmt(Math.min(...v))}</td><td>${fmt(Math.max(...v))}</td><td>${uniq}</td></tr>`;
+    } else {
+      h += `<tr><td>${esc(c)}</td><td>categorical</td><td>${miss}</td><td colspan="4" style="text-align:left">${[...new Set(raw)].slice(0, 6).map(esc).join(', ')}${uniq > 6 ? ', …' : ''}</td><td>${uniq}</td></tr>`;
+    }
+  });
+  $('statsTable').innerHTML = h;
+  $('previewTable').innerHTML = '<tr>' + columns.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>' +
+    rows.slice(0, 10).map(r => '<tr>' + columns.map(c => `<td>${esc(r[c])}</td>`).join('') + '</tr>').join('');
+}
+
+function renderFeatureList() {
+  const target = $('targetSel').value;
+  $('featList').innerHTML = DATA.columns.filter(c => c !== target).map(c => {
+    const uniq = new Set(DATA.rows.map(r => r[c])).size;
+    const isCat = DATA.types[c] === 'cat';
+    const ok = !isCat || uniq <= 30;      // skip id-like text columns
+    return `<label><input type="checkbox" value="${esc(c)}" ${ok ? 'checked' : ''}>${esc(c)}${isCat ? ` <span class="cat">(類別, ${uniq})</span>` : ''}</label>`;
+  }).join('');
+}
+
+// ---------------- preparation ----------------
+function buildDesign(features, target) {
+  const rows = DATA.rows.filter(r => r[target] !== '' && features.every(f => r[f] !== ''));
+  const cols = [], levels = {};
+  features.forEach(f => {
+    if (DATA.types[f] === 'num') cols.push({ name: f, src: f, kind: 'num' });
+    else {
+      const lv = [...new Set(rows.map(r => r[f]))].sort();
+      levels[f] = lv;
+      lv.slice(1).forEach(l => cols.push({ name: `${f}_${l}`, src: f, kind: 'dummy', level: l }));
+    }
+  });
+  const X = rows.map(r => cols.map(c => c.kind === 'num' ? Number(r[c.src]) : +(r[c.src] === c.level)));
+  const y = rows.map(r => Number(r[target]));
+  return { X, y, cols, levels, dropped: DATA.rows.length - rows.length };
+}
+
+// ---------------- modeling ----------------
+function train() {
+  if (!DATA) return;
+  const target = $('targetSel').value;
+  const features = [...$('featList').querySelectorAll('input:checked')].map(i => i.value);
+  if (!features.length) return setStatus('請至少勾選一個特徵', true);
+
+  const { X, y, cols, levels, dropped } = buildDesign(features, target);
+  const testSize = Math.min(Math.max(+$('testSize').value || 0.2, 0.05), 0.6);
+  const rand = mulberry32(+$('seed').value || 0);
+  const idx = [...y.keys()]; for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  const nTest = Math.max(1, Math.round(y.length * testSize));
+  const teI = idx.slice(0, nTest), trI = idx.slice(nTest);
+  const pick = (I, sel) => I.map(i => sel.map(j => X[i][j]));
+  if (trI.length <= cols.length + 1) return setStatus('訓練樣本數太少，無法估計所有係數', true);
+
+  // backward elimination on the training set
+  let active = cols.map((_, j) => j);
+  const log = [], sl = +$('sl').value || 0.05;
+  let fit = ols(pick(trI, active), trI.map(i => y[i]));
+  if (!fit) return setStatus('XᵀX 為奇異矩陣（特徵共線），請取消部分特徵', true);
+  if ($('method').value === 'backward') {
+    while (active.length > 1) {
+      const p = fit.p.slice(1), worst = p.indexOf(Math.max(...p));
+      if (!(p[worst] > sl)) break;
+      log.push({ name: cols[active[worst]].name, p: p[worst], adjBefore: fit.adjR2 });
+      active = active.filter((_, k) => k !== worst);
+      fit = ols(pick(trI, active), trI.map(i => y[i]));
+    }
+    // a single remaining feature is also tested
+    if (active.length === 1 && fit.p[1] > sl) log.push({ name: cols[active[0]].name, p: fit.p[1], adjBefore: fit.adjR2, kept: true });
+  }
+
+  const predict = row => fit.beta[0] + active.reduce((s, j, k) => s + fit.beta[k + 1] * row[j], 0);
+  const yTr = trI.map(i => y[i]), yTe = teI.map(i => y[i]);
+  const pTr = trI.map(i => predict(X[i])), pTe = teI.map(i => predict(X[i]));
+  MODEL = { target, cols, active, fit, levels, features, log,
+            train: metrics(yTr, pTr, active.length), test: metrics(yTe, pTe, active.length), yTe, pTe, X, y };
+
+  setStatus(`已載入 ${DATA.rows.length} 筆；train ${trI.length} / test ${teI.length}` + (dropped ? `；移除含缺值的 ${dropped} 筆` : ''));
+  renderResults();
+}
+
+// ---------------- evaluation ----------------
+function renderResults() {
+  const M = MODEL;
+  $('results').hidden = false;
+  $('evalSub').textContent = `target = ${M.target}，使用 ${M.active.length} / ${M.cols.length} 個特徵`;
+  const card = (k, te, tr, s = '') => `<div class="metric"><div class="k">${k}</div><div class="v">${fmt(te)}</div><div class="s">test　|　train ${fmt(tr)}${s}</div></div>`;
+  $('metrics').innerHTML =
+    card('R²', M.test.r2, M.train.r2) + card('Adjusted R²', M.test.adjR2, M.train.adjR2) +
+    card('MAE', M.test.mae, M.train.mae) + card('RMSE', M.test.rmse, M.train.rmse);
+
+  // equation
+  const b = M.fit.beta;
+  let eq = `${esc(M.target)} = ${fmt(b[0])}`;
+  M.active.forEach((j, k) => { const v = b[k + 1]; eq += ` ${v < 0 ? '−' : '+'} ${fmt(Math.abs(v))}·${esc(M.cols[j].name)}`; });
+  $('equation').innerHTML = eq;
+
+  // elimination log
+  if ($('method').value === 'backward') {
+    $('elimBox').innerHTML = M.log.length
+      ? `<div class="note" style="margin-bottom:6px">Backward Elimination 過程（SL = ${$('sl').value}）：</div><ol class="log">` +
+        M.log.map(l => l.kept ? `<li>${esc(l.name)} p = ${fmt(l.p)} &gt; SL，但為最後一個特徵，保留</li>`
+                              : `<li>移除 <b>${esc(l.name)}</b>（p = ${fmt(l.p)}，移除前 Adj R² = ${fmt(l.adjBefore)}）</li>`).join('') + '</ol>'
+      : `<div class="note">所有特徵 p-value 皆 ≤ ${$('sl').value}，沒有移除任何特徵。</div>`;
+  } else $('elimBox').innerHTML = '';
+
+  // coefficient table
+  const removed = new Set(M.log.filter(l => !l.kept).map(l => l.name));
+  let h = '<tr><th>Variable</th><th>Coefficient</th><th>Std. Error</th><th>t</th><th>p-value</th><th></th></tr>';
+  const row = (name, i) => {
+    const p = M.fit.p[i];
+    return `<tr><td>${esc(name)}</td><td>${fmt(M.fit.beta[i])}</td><td>${fmt(M.fit.se[i])}</td><td>${fmt(M.fit.t[i], 3)}</td>` +
+           `<td class="${p <= +$('sl').value ? 'sig' : 'nsig'}">${fmt(p)}</td><td>${p < .001 ? '***' : p < .01 ? '**' : p < .05 ? '*' : ''}</td></tr>`;
+  };
+  h += row('(Intercept)', 0);
+  M.active.forEach((j, k) => h += row(M.cols[j].name, k + 1));
+  M.cols.forEach(c => { if (removed.has(c.name)) h += `<tr class="removed"><td>${esc(c.name)}</td><td colspan="5">已移除</td></tr>`; });
+  $('coefTable').innerHTML = h;
+
+  renderCharts();
+  renderPredictForm();
+}
+
+function makeChart(id, cfg) { if (charts[id]) charts[id].destroy(); charts[id] = new Chart($(id), cfg); }
+
+function renderCharts() {
+  const M = MODEL, accent = '#2f6fdf';
+  const all = [...M.yTe, ...M.pTe], lo = Math.min(...all), hi = Math.max(...all);
+  const axis = t => ({ title: { display: true, text: t }, grid: { color: '#eef0f4' } });
+  makeChart('chartPred', {
+    type: 'scatter',
+    data: { datasets: [
+      { label: 'test samples', data: M.yTe.map((v, i) => ({ x: v, y: M.pTe[i] })), backgroundColor: accent + 'b0', pointRadius: 4 },
+      { label: 'y = x', type: 'line', data: [{ x: lo, y: lo }, { x: hi, y: hi }], borderColor: '#c2453b', borderDash: [5, 4], pointRadius: 0, borderWidth: 1.5 }
+    ] },
+    options: { maintainAspectRatio: false, scales: { x: axis(`Actual ${M.target}`), y: axis(`Predicted ${M.target}`) } }
+  });
+  makeChart('chartResid', {
+    type: 'scatter',
+    data: { datasets: [
+      { label: 'residual', data: M.pTe.map((p, i) => ({ x: p, y: M.yTe[i] - p })), backgroundColor: '#1a8f5ab0', pointRadius: 4 },
+      { label: '0', type: 'line', data: [{ x: Math.min(...M.pTe), y: 0 }, { x: Math.max(...M.pTe), y: 0 }], borderColor: '#64708a', pointRadius: 0, borderWidth: 1 }
+    ] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: axis('Predicted'), y: axis('Residual (actual − predicted)') } }
+  });
+  const corr = M.cols.map((c, j) => ({ name: c.name, r: pearson(M.X.map(r => r[j]), M.y) })).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+  makeChart('chartCorr', {
+    type: 'bar',
+    data: { labels: corr.map(c => c.name), datasets: [{ data: corr.map(c => c.r), backgroundColor: corr.map(c => c.r >= 0 ? accent : '#c2453b'), borderRadius: 3 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: -1, max: 1, grid: { color: '#eef0f4' } }, x: { grid: { display: false } } } }
+  });
+}
+
+// ---------------- deployment ----------------
+function renderPredictForm() {
+  const M = MODEL;
+  const used = [...new Set(M.active.map(j => M.cols[j].src))];
+  $('predForm').innerHTML = used.map(f => {
+    if (DATA.types[f] === 'cat')
+      return `<div class="field"><label>${esc(f)}</label><select data-f="${esc(f)}">${M.levels[f].map(l => `<option>${esc(l)}</option>`).join('')}</select></div>`;
+    const j = M.cols.findIndex(c => c.src === f), mean = M.X.reduce((s, r) => s + r[j], 0) / M.X.length;
+    return `<div class="field"><label>${esc(f)}</label><input type="number" step="any" data-f="${esc(f)}" value="${+mean.toPrecision(6)}"></div>`;
+  }).join('') || '<div class="note">模型沒有任何特徵。</div>';
+  $('predForm').querySelectorAll('[data-f]').forEach(el => el.addEventListener('input', doPredict));
+  doPredict();
+}
+
+function doPredict() {
+  const M = MODEL, vals = {};
+  $('predForm').querySelectorAll('[data-f]').forEach(el => vals[el.dataset.f] = el.value);
+  let yhat = M.fit.beta[0];
+  M.active.forEach((j, k) => { const c = M.cols[j]; yhat += M.fit.beta[k + 1] * (c.kind === 'num' ? Number(vals[c.src]) : +(vals[c.src] === c.level)); });
+  $('predOut').innerHTML = `預測 ${esc(M.target)} = <b>${fmt(yhat)}</b>　<span class="note">（預設值為各特徵平均）</span>`;
+}
+
+// ---------------- events ----------------
+function onProblemChange() {
+  const key = $('problemSel').value, p = PRESETS[key];
+  $('bizText').textContent = p.biz;
+  if (key === 'custom') { $('urlInput').value = ''; $('urlInput').focus(); setStatus('請輸入 CSV URL 後按「載入」'); }
+  else { $('urlInput').value = p.url; loadDataset(); }
+}
+$('problemSel').addEventListener('change', onProblemChange);
+$('loadBtn').addEventListener('click', loadDataset);
+$('urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadDataset(); });
+$('urlInput').addEventListener('input', () => {
+  const v = $('urlInput').value.trim(), match = Object.keys(PRESETS).find(k => PRESETS[k].url === v);
+  const key = match || 'custom'; if ($('problemSel').value !== key) { $('problemSel').value = key; $('bizText').textContent = PRESETS[key].biz; }
+});
+$('fileBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { $('problemSel').value = 'custom'; $('bizText').textContent = PRESETS.custom.biz; $('urlInput').value = '';
+        useData(parseCSV(await f.text()), null, f.name); }
+  catch (err) { setStatus('讀取失敗：' + err.message, true); }
+  e.target.value = '';
+});
+$('targetSel').addEventListener('change', () => { renderFeatureList(); train(); });
+$('trainBtn').addEventListener('click', train);
+$('featList').addEventListener('change', train);
+['method', 'sl', 'testSize', 'seed'].forEach(id => $(id).addEventListener('change', train));
+$('method').addEventListener('change', () => $('sl').disabled = $('method').value !== 'backward');
+
+onProblemChange();
+</script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+{
+  "startups": {
+    "name": "50 Startups",
+    "target": "Profit",
+    "n_rows": 50,
+    "features": [
+      "R&D Spend",
+      "Administration",
+      "Marketing Spend",
+      "State_Florida",
+      "State_New York"
+    ],
+    "all_features": {
+      "metrics": {
+        "R2": 0.8987,
+        "MAE": 6961.4778,
+        "RMSE": 9055.9573
+      },
+      "intercept": 54028.0396,
+      "coef": {
+        "R&D Spend": 0.8056,
+        "Administration": -0.0688,
+        "Marketing Spend": 0.0299,
+        "State_Florida": 938.793,
+        "State_New York": 6.9878
+      }
+    },
+    "backward_elimination": {
+      "steps": [
+        {
+          "removed": "State_New York",
+          "p_value": 0.9986,
+          "adj_r2": 0.9469
+        },
+        {
+          "removed": "State_Florida",
+          "p_value": 0.7755,
+          "adj_r2": 0.9484
+        },
+        {
+          "removed": "Administration",
+          "p_value": 0.257,
+          "adj_r2": 0.9497
+        },
+        {
+          "removed": "Marketing Spend",
+          "p_value": 0.0552,
+          "adj_r2": 0.9493
+        }
+      ],
+      "selected": [
+        "R&D Spend"
+      ],
+      "metrics": {
+        "R2": 0.9265,
+        "MAE": 6077.3633,
+        "RMSE": 7714.3349
+      },
+      "intercept": 49336.668,
+      "coef": {
+        "R&D Spend": 0.8536
+      }
+    }
+  },
+  "boston": {
+    "name": "Boston Housing",
+    "target": "medv",
+    "n_rows": 506,
+    "features": [
+      "crim",
+      "zn",
+      "indus",
+      "chas",
+      "nox",
+      "rm",
+      "age",
+      "dis",
+      "rad",
+      "tax",
+      "ptratio",
+      "b",
+      "lstat"
+    ],
+    "all_features": {
+      "metrics": {
+        "R2": 0.6688,
+        "MAE": 3.1891,
+        "RMSE": 4.9286
+      },
+      "intercept": 30.2468,
+      "coef": {
+        "crim": -0.1131,
+        "zn": 0.0301,
+        "indus": 0.0404,
+        "chas": 2.7844,
+        "nox": -17.2026,
+        "rm": 4.4388,
+        "age": -0.0063,
+        "dis": -1.4479,
+        "rad": 0.2624,
+        "tax": -0.0106,
+        "ptratio": -0.9155,
+        "b": 0.0124,
+        "lstat": -0.5086
+      }
+    },
+    "backward_elimination": {
+      "steps": [
+        {
+          "removed": "age",
+          "p_value": 0.6658,
+          "adj_r2": 0.7426
+        },
+        {
+          "removed": "indus",
+          "p_value": 0.557,
+          "adj_r2": 0.7431
+        },
+        {
+          "removed": "zn",
+          "p_value": 0.0614,
+          "adj_r2": 0.7435
+        }
+      ],
+      "selected": [
+        "crim",
+        "chas",
+        "nox",
+        "rm",
+        "dis",
+        "rad",
+        "tax",
+        "ptratio",
+        "b",
+        "lstat"
+      ],
+      "metrics": {
+        "R2": 0.6523,
+        "MAE": 3.2656,
+        "RMSE": 5.0498
+      },
+      "intercept": 30.9311,
+      "coef": {
+        "crim": -0.1086,
+        "chas": 2.8752,
+        "nox": -17.9539,
+        "rm": 4.4637,
+        "dis": -1.235,
+        "rad": 0.2381,
+        "tax": -0.0078,
+        "ptratio": -1.0122,
+        "b": 0.0123,
+        "lstat": -0.5102
+      }
+    }
+  }
+}
