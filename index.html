@@ -514,8 +514,11 @@ $('problemSel').addEventListener('change', onProblemChange);
 $('loadBtn').addEventListener('click', loadDataset);
 $('urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadDataset(); });
 $('urlInput').addEventListener('input', () => {
-  const v = $('urlInput').value.trim(), match = Object.keys(PRESETS).find(k => PRESETS[k].url === v);
-  const key = match || 'custom'; if ($('problemSel').value !== key) { $('problemSel').value = key; $('bizText').textContent = PRESETS[key].biz; }
+  // editing a preset's URL switches to custom mode; custom mode never jumps back to a preset
+  const key = $('problemSel').value;
+  if (key !== 'custom' && $('urlInput').value.trim() !== PRESETS[key].url) {
+    $('problemSel').value = 'custom'; $('bizText').textContent = PRESETS.custom.biz;
+  }
 });
 $('fileBtn').addEventListener('click', () => $('fileInput').click());
 $('fileInput').addEventListener('change', async e => {
